@@ -115,21 +115,22 @@ Samples must reuse the `request_id` from the original `StartStreamRequest`.
 
 ## Socket
 
-Default socket path:
+Default config file:
 
 ```text
-$XDG_RUNTIME_DIR/wattch.sock
+/etc/wattch/wattch.conf
 ```
 
-Fallback socket path:
+Default service socket path:
 
 ```text
-/tmp/wattch-$UID.sock
+/run/wattch/wattch.sock
 ```
 
-Environment override:
+Environment overrides:
 
 ```text
+WATTCH_CONFIG
 WATTCH_SOCKET
 ```
 
@@ -138,6 +139,14 @@ Socket permissions:
 ```text
 0600
 ```
+
+The daemon is expected to run as root when powercap permissions require it.
+
+The CLI is expected to run without root.
+
+When the daemon is started through `sudo`, it must use `SUDO_UID` and `SUDO_GID` to hand the root-created socket to the invoking user while keeping socket mode `0600`.
+
+For system services not launched through `sudo`, the config file may provide numeric `socket_uid` and `socket_gid` values.
 
 ## Powercap Path Requirement
 
@@ -221,7 +230,7 @@ Use monotonic time only.
 Minimum interval:
 
 ```text
-10_000_000 ns
+1_000_000 ns
 ```
 
 Default interval:

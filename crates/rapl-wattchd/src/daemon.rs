@@ -8,7 +8,7 @@ use tokio::net::UnixStream;
 use tokio::sync::{watch, Mutex};
 use wattch_core::{
     discover_powercap_sources, read_frame_async, validate_interval_ns, validate_source_ids,
-    write_frame_async, PowercapSource, Result, WattchError, PRODUCTION_POWER_CAP_ROOT,
+    write_frame_async, PowercapSource, Result, ServiceConfig, WattchError,
 };
 use wattch_proto::wattch::v1::{
     request, response, Error as ProtoError, HelloResponse, ListSourcesResponse, Request, Response,
@@ -16,7 +16,7 @@ use wattch_proto::wattch::v1::{
 };
 
 use crate::sampler;
-use crate::socket::{bind_socket, socket_path_from_env};
+use crate::socket::bind_socket;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const DAEMON_VERSION: &str = "0.1.0";
@@ -36,19 +36,22 @@ pub(crate) type SharedWriter = Arc<Mutex<OwnedWriteHalf>>;
 #[derive(Debug)]
 pub struct DaemonConfig {
     pub socket_path: PathBuf,
+    pub socket_mode: u32,
+    pub socket_uid: Option<u32>,
+    pub socket_gid: Option<u32>,
     pub powercap_root: PathBuf,
 }
 
 impl DaemonConfig {
-    pub fn from_env() -> Self {
-        let powercap_root = std::env::var_os("WATTCH_POWER_CAP_ROOT")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(PRODUCTION_POWER_CAP_ROOT));
-
-        Self {
-            socket_path: socket_path_from_env(),
-            powercap_root,
-        }
+    pub fn load() -> Result<Self> {
+        let config = ServiceConfig::load()?;
+        Ok(Self {
+            socket_path: config.socket_path,
+            socket_mode: config.socket_mode,
+            socket_uid: config.socket_uid,
+            socket_gid: config.socket_gid,
+            powercap_root: config.powercap_root,
+        })
     }
 }
 
@@ -88,11 +91,17 @@ impl DaemonState {
 }
 
 pub async fn run_from_env() -> Result<()> {
-    run(DaemonConfig::from_env()).await
+    run(DaemonConfig::load()?).await
 }
 
 pub async fn run(config: DaemonConfig) -> Result<()> {
-    let listener = bind_socket(&config.socket_path).await?;
+    let listener = bind_socket(
+        &config.socket_path,
+        config.socket_mode,
+        config.socket_uid,
+        config.socket_gid,
+    )
+    .await?;
     let state = Arc::new(DaemonState::new(config));
 
     loop {

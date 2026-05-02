@@ -1,8 +1,10 @@
+pub mod config;
 pub mod errors;
 pub mod framing;
 pub mod sources;
 pub mod time;
 
+pub use config::{ServiceConfig, DEFAULT_CONFIG_PATH, DEFAULT_SOCKET_MODE, DEFAULT_SOCKET_PATH};
 pub use errors::{Result, WattchError};
 pub use framing::{
     decode_frame, encode_frame, read_frame_async, write_frame_async, MAX_FRAME_SIZE,
@@ -12,7 +14,7 @@ pub use sources::powercap::{
     PRODUCTION_POWER_CAP_ROOT,
 };
 
-pub const MIN_INTERVAL_NS: u64 = 10_000_000;
+pub const MIN_INTERVAL_NS: u64 = 1_000_000;
 
 pub fn validate_interval_ns(interval_ns: u64) -> Result<()> {
     if interval_ns < MIN_INTERVAL_NS {

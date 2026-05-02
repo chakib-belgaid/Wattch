@@ -5,6 +5,7 @@ license.workspace = true
 version.workspace = true
 
 [dependencies]
+libc.workspace = true
 tokio.workspace = true
 wattch-core = { path = "../wattch-core" }
 wattch-proto = { path = "../wattch-proto" }
