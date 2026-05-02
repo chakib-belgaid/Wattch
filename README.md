@@ -1,43 +1,80 @@
 
 # wattch
 
-Energy profiling infrastructure for developers and AI coding agents.
+Wattch is a minimal local energy measurement daemon and CLI.
 
-## Problem
+This scaffold intentionally contains only Rust code:
 
-Most developers cannot measure the energy impact of code changes in a practical way. Existing tools are often deprecated, require root access, are hard to integrate into developer workflows, or assume clean benchmarking machines.
+- `rapl-wattchd`: local RAPL Unix socket server and sampling loop
+- `wattch-cli`: small plain-text client
+- `wattch-core`: shared framing, validation, time, and powercap helpers
+- `wattch-proto`: protobuf types generated with `prost`
 
-## Goal
+## Protocol
 
-Build an open-source protocol and toolchain for collecting, analyzing, and reporting software energy measurements across languages and developer tools.
+The daemon and CLI use Unix domain sockets. Every protobuf message is framed as:
 
-## Initial MVP
+```text
+[4-byte little-endian uint32 payload_length][protobuf payload]
+```
 
-- RAPL-based local energy measurement
-- Rust CLI
-- Python profiling integration
-- pyinstrument-compatible reporting
-- simple benchmark runner
-- machine-readable JSON output
-- first report format for humans and AI agents
+The maximum payload size is 1 MiB. There is no gRPC, HTTP, JSON wire protocol, database, persistent report system, plugin system, or profiler integration in this MVP.
 
-## Long-term direction
+## Runtime
 
-- VSCode extension
-- MCP server for coding agents
-- plugin system for multiple languages
-- energy regression detection
-- AI-assisted report generation
+Default config file:
 
-## Why this matters
+```text
+/etc/wattch/wattch.conf
+```
 
-AI coding agents will generate more code faster. Developers need feedback loops that make performance and energy impact visible before inefficient software silently compounds.
+Default service socket path:
 
-## Current status
+```text
+/run/wattch/wattch.sock
+```
 
-Early architecture and MVP design phase.
+The daemon discovers Linux RAPL powercap zones under:
 
-## Next milestone
+```text
+/sys/devices/virtual/powercap/intel-rapl
+```
 
-Produce a minimal working local measurement demo:
-`run command -> collect RAPL data -> output JSON report`.
+`rapl-wattchd` is expected to run as root when powercap permissions require it. When started through `sudo`, it uses `SUDO_UID` and `SUDO_GID` to hand the root-created socket to the invoking user with mode `0600`, so `wattch-cli` can run without root.
+
+Example config:
+
+```ini
+# /etc/wattch/wattch.conf
+socket_path = "/run/wattch/wattch.sock"
+socket_mode = 0600
+
+# Optional for system services not launched through sudo:
+# socket_uid = 1000
+# socket_gid = 1000
+```
+
+For deterministic tests and local experiments:
+
+- `WATTCH_CONFIG` overrides the config file path.
+- `WATTCH_SOCKET` overrides the socket path.
+- `WATTCH_POWER_CAP_ROOT` overrides the powercap root.
+
+## Commands
+
+```sh
+cargo build -p rapl-wattchd -p wattch-cli
+sudo ./target/debug/rapl-wattchd
+cargo run -p wattch-cli -- hello
+cargo run -p wattch-cli -- sources
+cargo run -p wattch-cli -- stream --interval-ms 100
+```
+
+## Verification
+
+```sh
+cargo fmt
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo build --workspace
+```

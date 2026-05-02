@@ -1,0 +1,15 @@
+[package]
+name = "rapl-wattchd"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+libc.workspace = true
+tokio.workspace = true
+wattch-core = { path = "../wattch-core" }
+wattch-proto = { path = "../wattch-proto" }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio.workspace = true

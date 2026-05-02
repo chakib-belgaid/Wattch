@@ -1,0 +1,11 @@
+[package]
+name = "wattch-proto"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+prost.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true

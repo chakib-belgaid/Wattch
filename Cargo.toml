@@ -1,0 +1,25 @@
+[workspace]
+members = [
+    "crates/wattch-cli",
+    "crates/wattch-core",
+    "crates/rapl-wattchd",
+    "crates/wattch-proto",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+version = "0.1.0"
+
+[workspace.dependencies]
+assert_cmd = "2"
+bytes = "1"
+clap = { version = "4", features = ["derive"] }
+libc = "0.2"
+predicates = "3"
+prost = "0.13"
+prost-build = "0.13"
+tempfile = "3"
+thiserror = "1"
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }

@@ -1,0 +1,15 @@
+[package]
+name = "wattch-core"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+bytes.workspace = true
+prost.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+wattch-proto = { path = "../wattch-proto" }
+
+[dev-dependencies]
+tempfile.workspace = true
