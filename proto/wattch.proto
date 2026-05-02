@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package wattch.v1;
+
+message Request {
+  uint64 request_id = 1;
+
+  oneof kind {
+    HelloRequest hello = 2;
+    ListSourcesRequest list_sources = 3;
+    StartStreamRequest start_stream = 4;
+    StopStreamRequest stop_stream = 5;
+  }
+}
+
+message Response {
+  uint64 request_id = 1;
+
+  oneof kind {
+    HelloResponse hello = 2;
+    ListSourcesResponse list_sources = 3;
+    StartStreamResponse start_stream = 4;
+    StopStreamResponse stop_stream = 5;
+    Sample sample = 6;
+    Error error = 7;
+  }
+}
+
+message HelloRequest {
+  uint32 protocol_version = 1;
+  string client_name = 2;
+}
+
+message HelloResponse {
+  uint32 protocol_version = 1;
+  string daemon_version = 2;
+}
+
+message ListSourcesRequest {}
+
+message ListSourcesResponse {
+  repeated Source sources = 1;
+}
+
+message Source {
+  uint32 source_id = 1;
+  string name = 2;
+  string kind = 3;
+  string unit = 4;
+  bool available = 5;
+}
+
+message StartStreamRequest {
+  repeated uint32 source_ids = 1;
+  uint64 interval_ns = 2;
+  bool include_raw = 3;
+}
+
+message StartStreamResponse {
+  bool started = 1;
+  uint64 effective_interval_ns = 2;
+}
+
+message StopStreamRequest {}
+
+message StopStreamResponse {
+  bool stopped = 1;
+}
+
+message Sample {
+  uint32 source_id = 1;
+  uint64 monotonic_ns = 2;
+  double energy_j = 3;
+  double delta_j = 4;
+  double power_w = 5;
+  uint64 interval_ns = 6;
+  bool counter_wrap = 7;
+}
+
+message Error {
+  uint32 code = 1;
+  string message = 2;
+}
