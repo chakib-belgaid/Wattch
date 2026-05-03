@@ -230,7 +230,7 @@ Use monotonic time only.
 Minimum interval:
 
 ```text
-1_000_000 ns
+100_000 ns
 ```
 
 Default interval:
@@ -289,16 +289,16 @@ Only one active stream is allowed globally.
 
 Multiple clients may connect, but only one can own the stream.
 
-If a second stream starts while another is active, return:
+If a second stream starts while another is active, return an idempotent no-op response:
 
 ```text
-STREAM_ALREADY_RUNNING
+StartStreamResponse { started: false, effective_interval_ns: <active interval> }
 ```
 
-If `StopStreamRequest` is sent while no stream exists, return:
+If `StopStreamRequest` is sent while no stream exists, return an idempotent success response:
 
 ```text
-STREAM_NOT_RUNNING
+StopStreamResponse { stopped: false }
 ```
 
 Invalid source IDs return:
@@ -329,17 +329,18 @@ Add new codes only when necessary.
 
 ## CLI
 
-Only implement:
+Implement only the Rust `wattch` CLI:
 
 ```text
-wattch-cli hello
-wattch-cli sources
-wattch-cli stream --interval-ms 100
+wattch hello
+wattch sources
+wattch stream
+wattch run -- <command>
 ```
 
-CLI output should be plain text.
+CLI table and line output should be plain text.
 
-Do not add JSON output yet.
+JSON, JSONL, and CSV are allowed only as CLI output formats. Do not change the daemon wire protocol to JSON.
 
 Do not add report generation.
 
@@ -397,8 +398,8 @@ powercap discovery:
   powercap_handles_missing_root
 
 validation:
-  validate_interval_accepts_10ms
-  validate_interval_rejects_below_10ms
+  validate_interval_accepts_100us
+  validate_interval_rejects_below_100us
   validate_source_ids_accepts_existing_ids
   validate_source_ids_rejects_missing_ids
 
@@ -413,8 +414,8 @@ Integration tests
 daemon_hello_roundtrip_over_unix_socket
 daemon_list_sources_over_unix_socket_with_fake_powercap_root
 daemon_start_stream_emits_samples_with_fake_powercap_root
-daemon_rejects_second_active_stream
-daemon_stop_without_stream_returns_error
+daemon_second_active_stream_start_is_idempotent
+daemon_stop_without_stream_is_idempotent
 cli_hello_smoke_test
 cli_sources_smoke_test_with_fake_daemon_or_fake_powercap
 
