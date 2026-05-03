@@ -63,6 +63,7 @@ pub struct DaemonState {
 
 struct ActiveStream {
     id: u64,
+    interval_ns: u64,
     stop_tx: watch::Sender<bool>,
 }
 
@@ -75,8 +76,12 @@ impl DaemonState {
         }
     }
 
-    async fn is_stream_active(&self) -> bool {
-        self.active_stream.lock().await.is_some()
+    async fn active_stream_interval_ns(&self) -> Option<u64> {
+        self.active_stream
+            .lock()
+            .await
+            .as_ref()
+            .map(|active| active.interval_ns)
     }
 
     pub(crate) async fn finish_stream(&self, stream_id: u64) {
@@ -166,9 +171,18 @@ async fn handle_request(
         }
         Some(request::Kind::ListSources(_)) => handle_list_sources(request_id, state, writer).await,
         Some(request::Kind::StartStream(start)) => {
-            if state.is_stream_active().await {
-                return send_wattch_error(&writer, request_id, WattchError::StreamAlreadyRunning)
-                    .await;
+            if let Some(interval_ns) = state.active_stream_interval_ns().await {
+                return send_response(
+                    &writer,
+                    &Response {
+                        request_id,
+                        kind: Some(response::Kind::StartStream(StartStreamResponse {
+                            started: false,
+                            effective_interval_ns: interval_ns,
+                        })),
+                    },
+                )
+                .await;
             }
 
             if let Err(error) = validate_interval_ns(start.interval_ns) {
@@ -244,6 +258,7 @@ async fn handle_start_stream(
         }
         *active_stream = Some(ActiveStream {
             id: stream_id,
+            interval_ns,
             stop_tx,
         });
     }
@@ -288,7 +303,16 @@ async fn handle_stop_stream(
     };
 
     let Some(active) = active else {
-        return send_wattch_error(&writer, request_id, WattchError::StreamNotRunning).await;
+        return send_response(
+            &writer,
+            &Response {
+                request_id,
+                kind: Some(response::Kind::StopStream(StopStreamResponse {
+                    stopped: false,
+                })),
+            },
+        )
+        .await;
     };
 
     let _ = active.stop_tx.send(true);

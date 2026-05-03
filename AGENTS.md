@@ -289,16 +289,16 @@ Only one active stream is allowed globally.
 
 Multiple clients may connect, but only one can own the stream.
 
-If a second stream starts while another is active, return:
+If a second stream starts while another is active, return an idempotent no-op response:
 
 ```text
-STREAM_ALREADY_RUNNING
+StartStreamResponse { started: false, effective_interval_ns: <active interval> }
 ```
 
-If `StopStreamRequest` is sent while no stream exists, return:
+If `StopStreamRequest` is sent while no stream exists, return an idempotent success response:
 
 ```text
-STREAM_NOT_RUNNING
+StopStreamResponse { stopped: false }
 ```
 
 Invalid source IDs return:
@@ -414,8 +414,8 @@ Integration tests
 daemon_hello_roundtrip_over_unix_socket
 daemon_list_sources_over_unix_socket_with_fake_powercap_root
 daemon_start_stream_emits_samples_with_fake_powercap_root
-daemon_rejects_second_active_stream
-daemon_stop_without_stream_returns_error
+daemon_second_active_stream_start_is_idempotent
+daemon_stop_without_stream_is_idempotent
 cli_hello_smoke_test
 cli_sources_smoke_test_with_fake_daemon_or_fake_powercap
 

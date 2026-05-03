@@ -181,7 +181,7 @@ async fn daemon_start_stream_emits_samples_with_fake_powercap_root() {
 }
 
 #[tokio::test]
-async fn daemon_rejects_second_active_stream() {
+async fn daemon_second_active_stream_start_is_idempotent() {
     let temp = TempDir::new().expect("tempdir");
     write_source(
         temp.path(),
@@ -226,13 +226,16 @@ async fn daemon_rejects_second_active_stream() {
     .await;
 
     match second_response.kind {
-        Some(response::Kind::Error(error)) => assert_eq!(error.code, 6),
+        Some(response::Kind::StartStream(start)) => {
+            assert!(!start.started);
+            assert_eq!(start.effective_interval_ns, 100_000_000);
+        }
         other => panic!("unexpected response: {other:?}"),
     }
 }
 
 #[tokio::test]
-async fn daemon_stop_without_stream_returns_error() {
+async fn daemon_stop_without_stream_is_idempotent() {
     let temp = TempDir::new().expect("tempdir");
     let socket = socket_path(&temp);
     let _daemon = spawn_daemon(&socket, temp.path()).await;
@@ -248,7 +251,65 @@ async fn daemon_stop_without_stream_returns_error() {
     .await;
 
     match response.kind {
-        Some(response::Kind::Error(error)) => assert_eq!(error.code, 7),
+        Some(response::Kind::StopStream(stop)) => assert!(!stop.stopped),
+        other => panic!("unexpected response: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn daemon_repeated_stop_is_idempotent() {
+    let temp = TempDir::new().expect("tempdir");
+    write_source(
+        temp.path(),
+        "intel-rapl/intel-rapl:0",
+        "package-0",
+        1_000_000,
+        262_143_000_000,
+    );
+    let socket = socket_path(&temp);
+    let _daemon = spawn_daemon(&socket, temp.path()).await;
+
+    let mut stream = UnixStream::connect(&socket).await.expect("connect daemon");
+    let start_response = roundtrip(
+        &mut stream,
+        &Request {
+            request_id: 7,
+            kind: Some(request::Kind::StartStream(StartStreamRequest {
+                source_ids: Vec::new(),
+                interval_ns: 100_000_000,
+                include_raw: false,
+            })),
+        },
+    )
+    .await;
+    assert!(matches!(
+        start_response.kind,
+        Some(response::Kind::StartStream(_))
+    ));
+
+    let first_stop = roundtrip(
+        &mut stream,
+        &Request {
+            request_id: 8,
+            kind: Some(request::Kind::StopStream(StopStreamRequest {})),
+        },
+    )
+    .await;
+    match first_stop.kind {
+        Some(response::Kind::StopStream(stop)) => assert!(stop.stopped),
+        other => panic!("unexpected response: {other:?}"),
+    }
+
+    let second_stop = roundtrip(
+        &mut stream,
+        &Request {
+            request_id: 9,
+            kind: Some(request::Kind::StopStream(StopStreamRequest {})),
+        },
+    )
+    .await;
+    match second_stop.kind {
+        Some(response::Kind::StopStream(stop)) => assert!(!stop.stopped),
         other => panic!("unexpected response: {other:?}"),
     }
 }
