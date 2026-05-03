@@ -230,7 +230,7 @@ Use monotonic time only.
 Minimum interval:
 
 ```text
-1_000_000 ns
+100_000 ns
 ```
 
 Default interval:
@@ -329,17 +329,18 @@ Add new codes only when necessary.
 
 ## CLI
 
-Only implement:
+Implement only the Rust `wattch` CLI:
 
 ```text
-wattch-cli hello
-wattch-cli sources
-wattch-cli stream --interval-ms 100
+wattch hello
+wattch sources
+wattch stream
+wattch run -- <command>
 ```
 
-CLI output should be plain text.
+CLI table and line output should be plain text.
 
-Do not add JSON output yet.
+JSON, JSONL, and CSV are allowed only as CLI output formats. Do not change the daemon wire protocol to JSON.
 
 Do not add report generation.
 
@@ -397,8 +398,8 @@ powercap discovery:
   powercap_handles_missing_root
 
 validation:
-  validate_interval_accepts_10ms
-  validate_interval_rejects_below_10ms
+  validate_interval_accepts_100us
+  validate_interval_rejects_below_100us
   validate_source_ids_accepts_existing_ids
   validate_source_ids_rejects_missing_ids
 

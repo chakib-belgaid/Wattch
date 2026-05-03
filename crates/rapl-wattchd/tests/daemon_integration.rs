@@ -56,6 +56,12 @@ fn write_source(root: &Path, relative: &str, name: &str, energy_uj: u64, max_uj:
     dir
 }
 
+fn replace_energy_uj(source_dir: &Path, energy_uj: u64) {
+    let temp_path = source_dir.join("energy_uj.tmp");
+    fs::write(&temp_path, energy_uj.to_string()).expect("write temp energy");
+    fs::rename(temp_path, source_dir.join("energy_uj")).expect("replace energy");
+}
+
 async fn roundtrip(stream: &mut UnixStream, request: &Request) -> Response {
     write_frame_async(stream, request)
         .await
@@ -162,7 +168,7 @@ async fn daemon_start_stream_emits_samples_with_fake_powercap_root() {
         Some(response::Kind::StartStream(_))
     ));
 
-    fs::write(source_dir.join("energy_uj"), "2000000").expect("update energy");
+    replace_energy_uj(&source_dir, 2_000_000);
     let sample_response: Response = read_frame_async(&mut stream).await.expect("read sample");
     match sample_response.kind {
         Some(response::Kind::Sample(sample)) => {

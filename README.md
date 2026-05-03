@@ -6,7 +6,7 @@ Wattch is a minimal local energy measurement daemon and CLI.
 This scaffold intentionally contains only Rust code:
 
 - `rapl-wattchd`: local RAPL Unix socket server and sampling loop
-- `wattch-cli`: small plain-text client
+- `wattch`: user-facing CLI built by the `wattch-cli` crate
 - `wattch-core`: shared framing, validation, time, and powercap helpers
 - `wattch-proto`: protobuf types generated with `prost`
 
@@ -40,7 +40,7 @@ The daemon discovers Linux RAPL powercap zones under:
 /sys/devices/virtual/powercap/intel-rapl
 ```
 
-`rapl-wattchd` is expected to run as root when powercap permissions require it. When started through `sudo`, it uses `SUDO_UID` and `SUDO_GID` to hand the root-created socket to the invoking user with mode `0600`, so `wattch-cli` can run without root.
+`rapl-wattchd` is expected to run as root when powercap permissions require it. When started through `sudo`, it uses `SUDO_UID` and `SUDO_GID` to hand the root-created socket to the invoking user with mode `0600`, so `wattch` can run without root.
 
 Example config:
 
@@ -65,9 +65,12 @@ For deterministic tests and local experiments:
 ```sh
 cargo build -p rapl-wattchd -p wattch-cli
 sudo ./target/debug/rapl-wattchd
-cargo run -p wattch-cli -- hello
-cargo run -p wattch-cli -- sources
-cargo run -p wattch-cli -- stream --interval-ms 100
+./target/debug/wattch hello
+./target/debug/wattch sources --format table
+./target/debug/wattch sources --format csv
+./target/debug/wattch stream --interval-ms 100 --duration 5s --format table
+./target/debug/wattch run -- cargo test
+./target/debug/wattch run --format csv -- cargo test
 ```
 
 ## Verification
