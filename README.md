@@ -1,14 +1,43 @@
 
 # wattch
 
+[![Rust CI](https://github.com/chakib-belgaid/Wattch/actions/workflows/ci.yml/badge.svg)](https://github.com/chakib-belgaid/Wattch/actions/workflows/ci.yml)
+
 Wattch is a minimal local energy measurement daemon and CLI.
 
-This scaffold intentionally contains only Rust code:
+The implementation intentionally contains only Rust code:
 
 - `rapl-wattchd`: local RAPL Unix socket server and sampling loop
 - `wattch`: user-facing CLI built by the `wattch-cli` crate
 - `wattch-core`: shared framing, validation, time, and powercap helpers
 - `wattch-proto`: protobuf types generated with `prost`
+
+## Current status
+
+Wattch currently measures RAPL package/domain energy through the local `rapl-wattchd` daemon. It does not claim exact process-level or function-level attribution.
+
+The `wattch` CLI currently supports `hello`, `sources`, `stream`, and `run`.
+
+## v0.1-alpha scope
+
+v0.1-alpha is focused on the local Rust daemon, Rust CLI, protobuf framing over Unix sockets, RAPL source discovery, and deterministic tests.
+
+It intentionally excludes non-Rust clients, service APIs, dashboards, databases, report generation, AI integration, profiler integration, and plugin systems.
+
+## Release packages
+
+GitHub Releases build Linux x86_64 packages for:
+
+- Debian stable (`.deb`)
+- Ubuntu 24.04 LTS (`.deb`)
+- Fedora latest (`.rpm`)
+- Rocky Linux 9 / RHEL-compatible systems (`.rpm`)
+- openSUSE Tumbleweed (`.rpm`)
+
+The packages install:
+
+- `wattch` to `/usr/bin/wattch`
+- `rapl-wattchd` to `/usr/sbin/rapl-wattchd`
 
 ## Protocol
 
@@ -73,10 +102,10 @@ sudo ./target/debug/rapl-wattchd
 ./target/debug/wattch run --format csv -- cargo test
 ```
 
-## Verification
+## Quality gate
 
 ```sh
-cargo fmt
+cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo build --workspace
