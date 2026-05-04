@@ -4,7 +4,7 @@
 # Local runtime files
 *.sock
 *.pid
-
+.codex
 # Logs and temporary files
 *.log
 *.tmp
@@ -26,3 +26,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+
+# codex
+.codex

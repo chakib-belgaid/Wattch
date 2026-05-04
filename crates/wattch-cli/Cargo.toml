@@ -3,10 +3,40 @@ name = "wattch-cli"
 edition.workspace = true
 license.workspace = true
 version.workspace = true
+description = "Minimal local energy measurement daemon and CLI"
+repository = "https://github.com/chakib-belgaid/Wattch"
 
 [[bin]]
 name = "wattch"
 path = "src/main.rs"
+
+[package.metadata.deb]
+name = "wattch"
+maintainer = "Wattch maintainers <noreply@github.com>"
+copyright = "2026 Wattch maintainers"
+extended-description = "Wattch measures local RAPL package/domain energy through a small Unix socket daemon and Rust CLI."
+depends = "$auto"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/wattch", "usr/bin/", "755"],
+    ["target/release/rapl-wattchd", "usr/sbin/", "755"],
+]
+
+[package.metadata.generate-rpm]
+name = "wattch"
+summary = "Minimal local energy measurement daemon and CLI"
+url = "https://github.com/chakib-belgaid/Wattch"
+
+[[package.metadata.generate-rpm.assets]]
+source = "target/release/wattch"
+dest = "/usr/bin/wattch"
+mode = "0755"
+
+[[package.metadata.generate-rpm.assets]]
+source = "target/release/rapl-wattchd"
+dest = "/usr/sbin/rapl-wattchd"
+mode = "0755"
 
 [dependencies]
 clap.workspace = true
