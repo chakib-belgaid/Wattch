@@ -105,8 +105,9 @@ sudo ./target/debug/rapl-wattchd
 ## Quality gate
 
 ```sh
+cargo metadata --locked --no-deps --format-version 1 > /dev/null
 cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo build --workspace
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace
+cargo build --locked --workspace
 ```
