@@ -23,13 +23,25 @@ impl Drop for DaemonProcess {
 }
 
 async fn spawn_daemon(socket_path: &Path, powercap_root: &Path) -> DaemonProcess {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_rapl-wattchd"))
+    spawn_daemon_with_backend(socket_path, powercap_root, None).await
+}
+
+async fn spawn_daemon_with_backend(
+    socket_path: &Path,
+    powercap_root: &Path,
+    backend: Option<&str>,
+) -> DaemonProcess {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_rapl-wattchd"));
+    command
         .env("WATTCH_SOCKET", socket_path)
         .env("WATTCH_POWER_CAP_ROOT", powercap_root)
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn daemon");
+        .stderr(Stdio::null());
+    if let Some(backend) = backend {
+        command.env("WATTCH_SOURCE_BACKEND", backend);
+    }
+
+    let mut child = command.spawn().expect("spawn daemon");
 
     for _ in 0..100 {
         if UnixStream::connect(socket_path).await.is_ok() {
@@ -41,6 +53,10 @@ async fn spawn_daemon(socket_path: &Path, powercap_root: &Path) -> DaemonProcess
     let _ = child.kill();
     let _ = child.wait();
     panic!("daemon did not create socket at {}", socket_path.display());
+}
+
+async fn spawn_fake_backend_daemon(socket_path: &Path, powercap_root: &Path) -> DaemonProcess {
+    spawn_daemon_with_backend(socket_path, powercap_root, Some("fake")).await
 }
 
 fn socket_path(temp: &TempDir) -> PathBuf {
@@ -132,6 +148,77 @@ async fn daemon_list_sources_over_unix_socket_with_fake_powercap_root() {
             assert_eq!(list.sources.len(), 2);
             assert_eq!(list.sources[0].name, "rapl:package-0");
             assert_eq!(list.sources[1].name, "rapl:core");
+        }
+        other => panic!("unexpected response: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn daemon_fake_backend_lists_deterministic_source() {
+    let temp = TempDir::new().expect("tempdir");
+    let socket = socket_path(&temp);
+    let _daemon = spawn_fake_backend_daemon(&socket, temp.path()).await;
+
+    let mut stream = UnixStream::connect(&socket).await.expect("connect daemon");
+    let response = roundtrip(
+        &mut stream,
+        &Request {
+            request_id: 20,
+            kind: Some(request::Kind::ListSources(ListSourcesRequest {})),
+        },
+    )
+    .await;
+
+    match response.kind {
+        Some(response::Kind::ListSources(list)) => {
+            assert_eq!(list.sources.len(), 1);
+            assert_eq!(list.sources[0].source_id, 1);
+            assert_eq!(list.sources[0].name, "fake:deterministic");
+            assert_eq!(list.sources[0].kind, "fake");
+            assert_eq!(list.sources[0].unit, "joule");
+            assert!(list.sources[0].available);
+        }
+        other => panic!("unexpected response: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn daemon_fake_backend_emits_deterministic_samples() {
+    let temp = TempDir::new().expect("tempdir");
+    let socket = socket_path(&temp);
+    let _daemon = spawn_fake_backend_daemon(&socket, temp.path()).await;
+
+    let mut stream = UnixStream::connect(&socket).await.expect("connect daemon");
+    let response = roundtrip(
+        &mut stream,
+        &Request {
+            request_id: 21,
+            kind: Some(request::Kind::StartStream(StartStreamRequest {
+                source_ids: Vec::new(),
+                interval_ns: 10_000_000,
+                include_raw: false,
+            })),
+        },
+    )
+    .await;
+    assert!(matches!(
+        response.kind,
+        Some(response::Kind::StartStream(_))
+    ));
+
+    let sample_response: Response =
+        tokio::time::timeout(Duration::from_secs(1), read_frame_async(&mut stream))
+            .await
+            .expect("sample timeout")
+            .expect("read sample");
+    match sample_response.kind {
+        Some(response::Kind::Sample(sample)) => {
+            assert_eq!(sample.source_id, 1);
+            assert_eq!(sample.energy_j, 105.0);
+            assert_eq!(sample.delta_j, 5.0);
+            assert_eq!(sample.power_w, 500.0);
+            assert_eq!(sample.interval_ns, 10_000_000);
+            assert!(!sample.counter_wrap);
         }
         other => panic!("unexpected response: {other:?}"),
     }
