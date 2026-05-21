@@ -12,9 +12,10 @@ pub use errors::{Result, WattchError};
 pub use framing::{
     decode_frame, encode_frame, read_frame_async, write_frame_async, MAX_FRAME_SIZE,
 };
+pub use sources::energy::{BoxedEnergySource, EnergySource, SourceMetadata};
 pub use sources::powercap::{
-    compute_delta_j, discover_powercap_sources, microjoules_to_joules, PowercapSource,
-    PRODUCTION_POWER_CAP_ROOT,
+    compute_delta_j, discover_powercap_energy_sources, discover_powercap_sources,
+    microjoules_to_joules, PowercapSource, PRODUCTION_POWER_CAP_ROOT,
 };
 pub use summary::{SourceSummary, SummaryAggregator};
 
@@ -31,13 +32,16 @@ pub fn validate_interval_ns(interval_ns: u64) -> Result<()> {
     Ok(())
 }
 
-pub fn validate_source_ids(source_ids: &[u32], available_sources: &[PowercapSource]) -> Result<()> {
+pub fn validate_source_ids<T>(source_ids: &[u32], available_sources: &[T]) -> Result<()>
+where
+    T: SourceMetadata,
+{
     for source_id in source_ids {
         match available_sources
             .iter()
-            .find(|source| source.source_id == *source_id)
+            .find(|source| source.source_id() == *source_id)
         {
-            Some(source) if source.available => {}
+            Some(source) if source.available() => {}
             Some(_) => return Err(WattchError::SourceUnavailable(*source_id)),
             None => return Err(WattchError::SourceNotFound(*source_id)),
         }
