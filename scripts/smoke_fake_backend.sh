@@ -25,7 +25,7 @@ cd "$ROOT_DIR"
 cargo build -p rapl-wattchd -p wattch-cli >"$BUILD_LOG" 2>&1
 
 WATTCH_SOCKET="$SOCKET" WATTCH_SOURCE_BACKEND=fake \
-  "$ROOT_DIR/target/debug/rapl-wattchd" >"$STDOUT_LOG" 2>"$STDERR_LOG" &
+  cargo run --quiet -p rapl-wattchd --bin rapl-wattchd >"$STDOUT_LOG" 2>"$STDERR_LOG" &
 DAEMON_PID=$!
 
 index=0
@@ -42,12 +42,12 @@ done
 
 [ -S "$SOCKET" ]
 
-WATTCH_SOCKET="$SOCKET" "$ROOT_DIR/target/debug/wattch" hello >/dev/null
-WATTCH_SOCKET="$SOCKET" "$ROOT_DIR/target/debug/wattch" sources >"$SOURCES_OUT"
+WATTCH_SOCKET="$SOCKET" cargo run --quiet -p wattch-cli --bin wattch -- hello >/dev/null
+WATTCH_SOCKET="$SOCKET" cargo run --quiet -p wattch-cli --bin wattch -- sources >"$SOURCES_OUT"
 grep -q "fake:deterministic" "$SOURCES_OUT"
-WATTCH_SOCKET="$SOCKET" "$ROOT_DIR/target/debug/wattch" stream --interval-ms 10 --duration 50ms --format csv >"$STREAM_OUT"
+WATTCH_SOCKET="$SOCKET" cargo run --quiet -p wattch-cli --bin wattch -- stream --interval-ms 10 --duration 50ms --format csv >"$STREAM_OUT"
 grep -q "fake:deterministic" "$STREAM_OUT"
-WATTCH_SOCKET="$SOCKET" "$ROOT_DIR/target/debug/wattch" run --interval-ms 10 -- sh -c "sleep 0.05" >"$RUN_OUT"
+WATTCH_SOCKET="$SOCKET" cargo run --quiet -p wattch-cli --bin wattch -- run --interval-ms 10 -- sh -c "sleep 0.05" >"$RUN_OUT"
 grep -q "fake:deterministic" "$RUN_OUT"
 
 printf '%s\n' "wattch smoke test passed"
