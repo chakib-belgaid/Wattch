@@ -7,8 +7,9 @@ use tokio::net::unix::OwnedWriteHalf;
 use tokio::net::UnixStream;
 use tokio::sync::{watch, Mutex};
 use wattch_core::{
-    discover_powercap_energy_sources, read_frame_async, validate_interval_ns, validate_source_ids,
-    write_frame_async, BoxedEnergySource, Result, ServiceConfig, SourceMetadata, WattchError,
+    discover_powercap_energy_sources, fake_energy_sources, read_frame_async, validate_interval_ns,
+    validate_source_ids, write_frame_async, BoxedEnergySource, Result, ServiceConfig,
+    SourceMetadata, WattchError,
 };
 use wattch_proto::wattch::v1::{
     request, response, Error as ProtoError, HelloResponse, ListSourcesResponse, Request, Response,
@@ -40,6 +41,29 @@ pub struct DaemonConfig {
     pub socket_uid: Option<u32>,
     pub socket_gid: Option<u32>,
     pub powercap_root: PathBuf,
+    pub source_backend: SourceBackend,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SourceBackend {
+    Powercap,
+    Fake,
+}
+
+impl SourceBackend {
+    fn load() -> Result<Self> {
+        let Some(value) = std::env::var_os("WATTCH_SOURCE_BACKEND") else {
+            return Ok(Self::Powercap);
+        };
+        let value = value.to_string_lossy();
+        match value.as_ref() {
+            "powercap" | "rapl" => Ok(Self::Powercap),
+            "fake" => Ok(Self::Fake),
+            other => Err(WattchError::BadRequest(format!(
+                "unsupported source backend {other:?}"
+            ))),
+        }
+    }
 }
 
 impl DaemonConfig {
@@ -51,6 +75,7 @@ impl DaemonConfig {
             socket_uid: config.socket_uid,
             socket_gid: config.socket_gid,
             powercap_root: config.powercap_root,
+            source_backend: SourceBackend::load()?,
         })
     }
 }
@@ -329,7 +354,10 @@ async fn handle_stop_stream(
 }
 
 fn discover_sources(config: &DaemonConfig) -> Result<Vec<BoxedEnergySource>> {
-    discover_powercap_energy_sources(&config.powercap_root)
+    match config.source_backend {
+        SourceBackend::Powercap => discover_powercap_energy_sources(&config.powercap_root),
+        SourceBackend::Fake => Ok(fake_energy_sources()),
+    }
 }
 
 fn select_sources(
