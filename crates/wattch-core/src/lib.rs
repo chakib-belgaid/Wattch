@@ -13,6 +13,7 @@ pub use framing::{
     decode_frame, encode_frame, read_frame_async, write_frame_async, MAX_FRAME_SIZE,
 };
 pub use sources::energy::{BoxedEnergySource, EnergySource, SourceMetadata};
+pub use sources::fake::{fake_energy_sources, FakeEnergySource};
 pub use sources::powercap::{
     compute_delta_j, discover_powercap_energy_sources, discover_powercap_sources,
     microjoules_to_joules, PowercapSource, PRODUCTION_POWER_CAP_ROOT,
