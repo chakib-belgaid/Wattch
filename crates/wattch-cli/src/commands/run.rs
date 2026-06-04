@@ -110,7 +110,12 @@ fn observe_sample(
 
 fn expect_start_stream(response: Response) -> Result<(), Box<dyn std::error::Error>> {
     match response.kind {
-        Some(response::Kind::StartStream(_)) => Ok(()),
+        Some(response::Kind::StartStream(start)) if start.started => Ok(()),
+        Some(response::Kind::StartStream(start)) => Err(format!(
+            "daemon stream already active at interval {} ns",
+            start.effective_interval_ns
+        )
+        .into()),
         Some(response::Kind::Error(error)) => {
             Err(format!("daemon error {}: {}", error.code, error.message).into())
         }

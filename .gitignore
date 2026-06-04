@@ -5,6 +5,11 @@
 *.sock
 *.pid
 .codex
+
+# Local archive/audit artifacts
+/private_legal_audit/
+/docs/legal_audit/
+
 # Logs and temporary files
 *.log
 *.tmp

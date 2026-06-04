@@ -41,6 +41,7 @@ pub enum Command {
         #[arg(long)]
         summary: bool,
     },
+    #[command(about = "Run a command while measuring daemon-reported energy")]
     Run {
         #[arg(long, default_value_t = DEFAULT_STREAM_INTERVAL_MS)]
         interval_ms: u64,

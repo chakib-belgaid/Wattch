@@ -12,6 +12,21 @@ not claim process-level or function-level energy attribution.
 Current work is focused on validation, reproducibility, and a cleaner
 protocol-first design before adding more hardware backends.
 
+- `rapl-wattchd`: local RAPL Unix socket server and sampling loop
+- `wattch`: user-facing CLI built by the `wattch-cli` crate
+- `wattch-core`: shared framing, validation, time, and powercap helpers
+- `wattch-proto`: protobuf types generated with `prost`
+
+## Status
+
+This repository is the original Wattch v0 prototype.
+
+It validated the feasibility of a local Rust-based energy measurement daemon
+and CLI using RAPL, protobuf framing, and Unix sockets.
+
+Active work is moving toward a production-oriented rewrite focused on a
+backend-independent protocol, deterministic validation, and reproducible
+measurement harnesses.
 
 ## v0.1-alpha scope
 
@@ -103,6 +118,13 @@ sudo ./target/debug/rapl-wattchd
 ./target/debug/wattch run -- cargo test
 ./target/debug/wattch run --format csv -- cargo test
 ```
+
+`wattch run -- <command>` is the command wrapper for energy measurement. It
+uses the same daemon connection settings as the other CLI commands: first the
+default `/etc/wattch/wattch.conf` or `WATTCH_CONFIG`, then `WATTCH_SOCKET` as an
+environment override for the socket path. The wrapper reports RAPL energy
+observed while the child command runs; it does not provide function-level or
+process-exclusive attribution.
 
 Deterministic fake backend example:
 
