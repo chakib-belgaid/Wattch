@@ -3,9 +3,14 @@
 
 [![Rust CI](https://github.com/chakib-belgaid/Wattch/actions/workflows/ci.yml/badge.svg)](https://github.com/chakib-belgaid/Wattch/actions/workflows/ci.yml)
 
-Wattch is a minimal local energy measurement daemon and CLI.
+Status: v0.1 exploratory prototype.
 
-The implementation intentionally contains only Rust code:
+Wattch currently demonstrates a minimal Rust RAPL daemon/CLI pipeline,
+protobuf framing over Unix sockets, and a deterministic fake backend for
+repeatable tests. The current version is not a production profiler and does
+not claim process-level or function-level energy attribution.
+Current work is focused on validation, reproducibility, and a cleaner
+protocol-first design before adding more hardware backends.
 
 - `rapl-wattchd`: local RAPL Unix socket server and sampling loop
 - `wattch`: user-facing CLI built by the `wattch-cli` crate
@@ -93,6 +98,13 @@ For deterministic tests and local experiments:
 - `WATTCH_CONFIG` overrides the config file path.
 - `WATTCH_SOCKET` overrides the socket path.
 - `WATTCH_POWER_CAP_ROOT` overrides the powercap root.
+- `WATTCH_SOURCE_BACKEND` selects the daemon source backend:
+  - unset, `powercap`, or `rapl`: discover real Linux powercap/RAPL sources.
+  - `fake`: use one deterministic in-memory source named `fake:deterministic`.
+
+The fake backend is configured only on the daemon process. The CLI only needs to point at the same Unix socket. The fake source does not require root or a Linux powercap sysfs tree.
+
+Full details are in [docs/deterministic-source.md](docs/deterministic-source.md).
 
 ## Commands
 
@@ -113,6 +125,31 @@ default `/etc/wattch/wattch.conf` or `WATTCH_CONFIG`, then `WATTCH_SOCKET` as an
 environment override for the socket path. The wrapper reports RAPL energy
 observed while the child command runs; it does not provide function-level or
 process-exclusive attribution.
+
+Deterministic fake backend example:
+
+```sh
+cargo build -p rapl-wattchd -p wattch-cli
+
+export WATTCH_SOCKET=/tmp/wattch-fake.sock
+rm -f "$WATTCH_SOCKET"
+WATTCH_SOURCE_BACKEND=fake cargo run --quiet -p rapl-wattchd --bin rapl-wattchd
+```
+
+In another terminal:
+
+```sh
+export WATTCH_SOCKET=/tmp/wattch-fake.sock
+cargo run --quiet -p wattch-cli --bin wattch -- sources
+cargo run --quiet -p wattch-cli --bin wattch -- stream --source 1 --interval-ms 10 --duration 50ms --format csv
+cargo run --quiet -p wattch-cli --bin wattch -- run --source 1 --interval-ms 10 -- sh -c "sleep 0.05"
+```
+
+Or run the scripted end-to-end smoke check:
+
+```sh
+scripts/smoke_fake_backend.sh
+```
 
 ## Quality gate
 

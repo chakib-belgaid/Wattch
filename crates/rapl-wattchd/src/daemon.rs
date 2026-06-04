@@ -7,8 +7,9 @@ use tokio::net::unix::OwnedWriteHalf;
 use tokio::net::UnixStream;
 use tokio::sync::{watch, Mutex};
 use wattch_core::{
-    discover_powercap_sources, read_frame_async, validate_interval_ns, validate_source_ids,
-    write_frame_async, PowercapSource, Result, ServiceConfig, WattchError,
+    discover_powercap_energy_sources, fake_energy_sources, read_frame_async, validate_interval_ns,
+    validate_source_ids, write_frame_async, BoxedEnergySource, Result, ServiceConfig,
+    SourceMetadata, WattchError,
 };
 use wattch_proto::wattch::v1::{
     request, response, Error as ProtoError, HelloResponse, ListSourcesResponse, Request, Response,
@@ -40,6 +41,29 @@ pub struct DaemonConfig {
     pub socket_uid: Option<u32>,
     pub socket_gid: Option<u32>,
     pub powercap_root: PathBuf,
+    pub source_backend: SourceBackend,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SourceBackend {
+    Powercap,
+    Fake,
+}
+
+impl SourceBackend {
+    fn load() -> Result<Self> {
+        let Some(value) = std::env::var_os("WATTCH_SOURCE_BACKEND") else {
+            return Ok(Self::Powercap);
+        };
+        let value = value.to_string_lossy();
+        match value.as_ref() {
+            "powercap" | "rapl" => Ok(Self::Powercap),
+            "fake" => Ok(Self::Fake),
+            other => Err(WattchError::BadRequest(format!(
+                "unsupported source backend {other:?}"
+            ))),
+        }
+    }
 }
 
 impl DaemonConfig {
@@ -51,6 +75,7 @@ impl DaemonConfig {
             socket_uid: config.socket_uid,
             socket_gid: config.socket_gid,
             powercap_root: config.powercap_root,
+            source_backend: SourceBackend::load()?,
         })
     }
 }
@@ -189,7 +214,7 @@ async fn handle_request(
                 return send_wattch_error(&writer, request_id, error).await;
             }
 
-            let sources = match discover_powercap_sources(&state.config.powercap_root) {
+            let sources = match discover_sources(&state.config) {
                 Ok(sources) => sources,
                 Err(error) => return send_wattch_error(&writer, request_id, error).await,
             };
@@ -198,7 +223,7 @@ async fn handle_request(
                 return send_wattch_error(&writer, request_id, error).await;
             }
 
-            let selected_sources = select_sources(&start.source_ids, &sources);
+            let selected_sources = select_sources(&start.source_ids, sources);
             handle_start_stream(
                 request_id,
                 start.interval_ns,
@@ -224,7 +249,7 @@ async fn handle_list_sources(
     state: Arc<DaemonState>,
     writer: SharedWriter,
 ) -> Result<()> {
-    let sources = match discover_powercap_sources(&state.config.powercap_root) {
+    let sources = match discover_sources(&state.config) {
         Ok(sources) => sources,
         Err(error) => return send_wattch_error(&writer, request_id, error).await,
     };
@@ -234,7 +259,7 @@ async fn handle_list_sources(
         &Response {
             request_id,
             kind: Some(response::Kind::ListSources(ListSourcesResponse {
-                sources: sources.iter().map(PowercapSource::to_proto).collect(),
+                sources: sources.iter().map(SourceMetadata::to_proto).collect(),
             })),
         },
     )
@@ -244,7 +269,7 @@ async fn handle_list_sources(
 async fn handle_start_stream(
     request_id: u64,
     interval_ns: u64,
-    sources: Vec<PowercapSource>,
+    sources: Vec<BoxedEnergySource>,
     state: Arc<DaemonState>,
     writer: SharedWriter,
 ) -> Result<()> {
@@ -328,24 +353,34 @@ async fn handle_stop_stream(
     .await
 }
 
-fn select_sources(source_ids: &[u32], sources: &[PowercapSource]) -> Vec<PowercapSource> {
+fn discover_sources(config: &DaemonConfig) -> Result<Vec<BoxedEnergySource>> {
+    match config.source_backend {
+        SourceBackend::Powercap => discover_powercap_energy_sources(&config.powercap_root),
+        SourceBackend::Fake => Ok(fake_energy_sources()),
+    }
+}
+
+fn select_sources(
+    source_ids: &[u32],
+    mut sources: Vec<BoxedEnergySource>,
+) -> Vec<BoxedEnergySource> {
     if source_ids.is_empty() {
         return sources
-            .iter()
-            .filter(|source| source.available)
-            .cloned()
+            .into_iter()
+            .filter(|source| source.available())
             .collect();
     }
 
-    source_ids
-        .iter()
-        .filter_map(|source_id| {
-            sources
-                .iter()
-                .find(|source| source.source_id == *source_id && source.available)
-        })
-        .cloned()
-        .collect()
+    let mut selected = Vec::new();
+    for source_id in source_ids {
+        if let Some(index) = sources
+            .iter()
+            .position(|source| source.source_id() == *source_id && source.available())
+        {
+            selected.push(sources.remove(index));
+        }
+    }
+    selected
 }
 
 pub(crate) async fn send_response(writer: &SharedWriter, response: &Response) -> Result<()> {

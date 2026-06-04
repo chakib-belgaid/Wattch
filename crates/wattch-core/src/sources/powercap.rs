@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use wattch_proto::wattch::v1::Source;
 
 use crate::errors::{Result, WattchError};
+use crate::sources::energy::{BoxedEnergySource, EnergySource, SourceMetadata};
 
 pub const PRODUCTION_POWER_CAP_ROOT: &str = "/sys/devices/virtual/powercap";
 
@@ -20,17 +21,43 @@ pub struct PowercapSource {
 
 impl PowercapSource {
     pub fn to_proto(&self) -> Source {
-        Source {
-            source_id: self.source_id,
-            name: self.name.clone(),
-            kind: self.kind.clone(),
-            unit: self.unit.clone(),
-            available: self.available,
-        }
+        SourceMetadata::to_proto(self)
     }
 
     pub fn read_energy_j(&self) -> Result<f64> {
         read_energy_j(&self.path)
+    }
+}
+
+impl SourceMetadata for PowercapSource {
+    fn source_id(&self) -> u32 {
+        self.source_id
+    }
+
+    fn source_name(&self) -> &str {
+        &self.name
+    }
+
+    fn kind(&self) -> &str {
+        &self.kind
+    }
+
+    fn unit(&self) -> &str {
+        &self.unit
+    }
+
+    fn available(&self) -> bool {
+        self.available
+    }
+}
+
+impl EnergySource for PowercapSource {
+    fn read_energy_j(&self) -> Result<f64> {
+        PowercapSource::read_energy_j(self)
+    }
+
+    fn max_energy_j(&self) -> f64 {
+        self.max_energy_j
     }
 }
 
@@ -63,6 +90,13 @@ pub fn discover_powercap_sources(root: &Path) -> Result<Vec<PowercapSource>> {
     }
 
     Ok(sources)
+}
+
+pub fn discover_powercap_energy_sources(root: &Path) -> Result<Vec<BoxedEnergySource>> {
+    Ok(discover_powercap_sources(root)?
+        .into_iter()
+        .map(|source| Box::new(source) as BoxedEnergySource)
+        .collect())
 }
 
 pub fn compute_delta_j(previous: f64, current: f64, max_range: f64) -> (f64, bool) {
