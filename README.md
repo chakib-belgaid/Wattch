@@ -12,20 +12,16 @@ The implementation intentionally contains only Rust code:
 - `wattch-core`: shared framing, validation, time, and powercap helpers
 - `wattch-proto`: protobuf types generated with `prost`
 
-## Current status
+## Status
 
-Wattch is frozen and archived as of 2026-06-04. The project achieved its goal:
-checking that a small Rust daemon and Rust CLI can measure Linux RAPL
-package/domain energy through the canonical powercap interface.
+This repository is the original Wattch v0 prototype.
 
-Wattch currently measures RAPL package/domain energy through the local
-`rapl-wattchd` daemon. It does not claim exact process-level or function-level
-attribution.
+It validated the feasibility of a local Rust-based energy measurement daemon
+and CLI using RAPL, protobuf framing, and Unix sockets.
 
-The `wattch` CLI currently supports `hello`, `sources`, `stream`, and `run`.
-
-No active product development is planned. Future changes should be limited to
-critical fixes, security/dependency maintenance, or an explicit unarchive.
+Active work is moving toward a production-oriented rewrite focused on a
+backend-independent protocol, deterministic validation, and reproducible
+measurement harnesses.
 
 ## v0.1-alpha scope
 
