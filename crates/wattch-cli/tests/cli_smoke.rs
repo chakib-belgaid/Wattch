@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use assert_cmd::Command;
-use predicates::str::contains;
+use predicates::str::{contains, is_empty};
 use tempfile::TempDir;
 use tokio::net::UnixListener;
 use wattch_core::{read_frame_async, write_frame_async};
@@ -130,9 +130,60 @@ async fn spawn_fake_daemon(socket: &Path) -> tokio::task::JoinHandle<()> {
     })
 }
 
+async fn spawn_fake_busy_daemon(socket: &Path) -> tokio::task::JoinHandle<()> {
+    let listener = UnixListener::bind(socket).expect("bind fake daemon socket");
+    tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.expect("accept cli");
+        loop {
+            let request: Request = match read_frame_async(&mut stream).await {
+                Ok(request) => request,
+                Err(_) => break,
+            };
+
+            match request.kind {
+                Some(request::Kind::ListSources(_)) => {
+                    write_frame_async(
+                        &mut stream,
+                        &Response {
+                            request_id: request.request_id,
+                            kind: Some(response::Kind::ListSources(ListSourcesResponse {
+                                sources: sources(),
+                            })),
+                        },
+                    )
+                    .await
+                    .expect("write sources");
+                }
+                Some(request::Kind::StartStream(_)) => {
+                    write_frame_async(
+                        &mut stream,
+                        &Response {
+                            request_id: request.request_id,
+                            kind: Some(response::Kind::StartStream(StartStreamResponse {
+                                started: false,
+                                effective_interval_ns: 100_000_000,
+                            })),
+                        },
+                    )
+                    .await
+                    .expect("write busy start");
+                }
+                _ => {}
+            }
+        }
+    })
+}
+
 fn wattch(socket: &Path) -> Command {
     let mut command = Command::cargo_bin("wattch").expect("cli binary");
     command.env("WATTCH_SOCKET", socket);
+    command
+}
+
+fn wattch_with_config(config_path: &Path) -> Command {
+    let mut command = Command::cargo_bin("wattch").expect("cli binary");
+    command.env("WATTCH_CONFIG", config_path);
+    command.env_remove("WATTCH_SOCKET");
     command
 }
 
@@ -248,6 +299,46 @@ async fn cli_run_executes_command_and_prints_summary() {
         .stdout(contains("rapl:package-0"));
 
     fake_daemon.await.expect("fake daemon task");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cli_run_uses_socket_from_config_file() {
+    let temp = TempDir::new().expect("tempdir");
+    let socket = socket_path(&temp);
+    let config_path = temp.path().join("wattch.conf");
+    std::fs::write(
+        &config_path,
+        format!("socket_path = \"{}\"\n", socket.display()),
+    )
+    .expect("write config");
+    let fake_daemon = spawn_fake_daemon(&socket).await;
+
+    wattch_with_config(&config_path)
+        .args(["run", "--", "sh", "-c", "sleep 0.08"])
+        .assert()
+        .success()
+        .stdout(contains("Command: sh -c sleep 0.08"))
+        .stdout(contains("rapl:package-0"));
+
+    fake_daemon.await.expect("fake daemon task");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cli_run_refuses_to_execute_when_daemon_stream_is_busy() {
+    let temp = TempDir::new().expect("tempdir");
+    let socket = socket_path(&temp);
+    let fake_daemon = spawn_fake_busy_daemon(&socket).await;
+
+    wattch(&socket)
+        .args(["run", "--", "sh", "-c", "echo should-not-run"])
+        .assert()
+        .failure()
+        .stdout(is_empty())
+        .stderr(contains(
+            "daemon stream already active at interval 100000000 ns",
+        ));
+
+    fake_daemon.abort();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

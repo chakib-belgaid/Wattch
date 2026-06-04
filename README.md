@@ -14,9 +14,18 @@ The implementation intentionally contains only Rust code:
 
 ## Current status
 
-Wattch currently measures RAPL package/domain energy through the local `rapl-wattchd` daemon. It does not claim exact process-level or function-level attribution.
+Wattch is frozen and archived as of 2026-06-04. The project achieved its goal:
+checking that a small Rust daemon and Rust CLI can measure Linux RAPL
+package/domain energy through the canonical powercap interface.
+
+Wattch currently measures RAPL package/domain energy through the local
+`rapl-wattchd` daemon. It does not claim exact process-level or function-level
+attribution.
 
 The `wattch` CLI currently supports `hello`, `sources`, `stream`, and `run`.
+
+No active product development is planned. Future changes should be limited to
+critical fixes, security/dependency maintenance, or an explicit unarchive.
 
 ## v0.1-alpha scope
 
@@ -101,6 +110,13 @@ sudo ./target/debug/rapl-wattchd
 ./target/debug/wattch run -- cargo test
 ./target/debug/wattch run --format csv -- cargo test
 ```
+
+`wattch run -- <command>` is the command wrapper for energy measurement. It
+uses the same daemon connection settings as the other CLI commands: first the
+default `/etc/wattch/wattch.conf` or `WATTCH_CONFIG`, then `WATTCH_SOCKET` as an
+environment override for the socket path. The wrapper reports RAPL energy
+observed while the child command runs; it does not provide function-level or
+process-exclusive attribution.
 
 ## Quality gate
 
