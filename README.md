@@ -3,20 +3,15 @@
 
 [![Rust CI](https://github.com/chakib-belgaid/Wattch/actions/workflows/ci.yml/badge.svg)](https://github.com/chakib-belgaid/Wattch/actions/workflows/ci.yml)
 
-Wattch is a minimal local energy measurement daemon and CLI.
+Status: v0.1 exploratory prototype.
 
-The implementation intentionally contains only Rust code:
+Wattch currently demonstrates a minimal Rust RAPL daemon/CLI pipeline,
+protobuf framing over Unix sockets, and a deterministic fake backend for
+repeatable tests. The current version is not a production profiler and does
+not claim process-level or function-level energy attribution.
+Current work is focused on validation, reproducibility, and a cleaner
+protocol-first design before adding more hardware backends.
 
-- `rapl-wattchd`: local RAPL Unix socket server and sampling loop
-- `wattch`: user-facing CLI built by the `wattch-cli` crate
-- `wattch-core`: shared framing, validation, time, and powercap helpers
-- `wattch-proto`: protobuf types generated with `prost`
-
-## Current status
-
-Wattch currently measures RAPL package/domain energy through the local `rapl-wattchd` daemon. It also has a deterministic fake source backend for repeatable local tests and smoke checks. It does not claim exact process-level or function-level attribution.
-
-The `wattch` CLI currently supports `hello`, `sources`, `stream`, and `run`.
 
 ## v0.1-alpha scope
 
